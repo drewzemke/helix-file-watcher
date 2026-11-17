@@ -26,7 +26,11 @@
 
 (define (path->doc-id path)
   (define paths
-    (filter (lambda (doc-id) (equal? (editor-document->path doc-id) path)) (editor-all-documents)))
+    ;; watcher reports canonical paths, so compare canonical-to-canonical (symlinks)
+    (filter (lambda (doc-id)
+              (let ([p (editor-document->path doc-id)])
+                (and p (equal? (try-canonicalize-path p) path))))
+            (editor-all-documents)))
 
   (if (= (length paths) 1) (car paths) #f))
 
