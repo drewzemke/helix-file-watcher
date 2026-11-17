@@ -15,8 +15,8 @@
   (~>> (editor-all-documents)
        (map editor-document->path)
        (filter id)
-       (map try-canonicalize-path)
-       (filter id)))
+       ;; new files don't exist yet; the parent dir is what gets watched anyway
+       (map (lambda (p) (or (try-canonicalize-path p) p)))))
 
 (define (try-canonicalize-path x)
   (with-handler (lambda (err)
