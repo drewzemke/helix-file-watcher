@@ -52,7 +52,9 @@
     (define file-last-modified (try-file-last-modified x))
 
     ;; Racing helix... no good
+    ;; never clobber unsaved edits
     (when (and file-last-modified
+               (not (editor-document-dirty? doc-id))
                (system-time<? helix-doc-last-saved file-last-modified))
       (log::info! (to-string "reloading file: " x))
       (editor-document-reload doc-id)
