@@ -6,7 +6,6 @@ use std::{
         mpsc::{Receiver, TryRecvError},
         Arc, Mutex,
     },
-    time::Duration,
 };
 
 use abi_stable::std_types::{RBoxError, RResult, RString, RVec};
@@ -17,8 +16,6 @@ use steel::{
 };
 
 steel::declare_module!(build_module);
-
-const EVENT_BATCH_DEBOUNCE: Duration = Duration::from_millis(50);
 
 fn file_watcher_module() -> FFIModule {
     let mut module = FFIModule::new("steel/file-watcher");
@@ -59,30 +56,11 @@ impl EventReceiver {
         .unwrap()
     }
 
+    // never blocks: ffi calls hold a write lock on `self` that steel's gc needs to read,
+    // so a blocking recv here deadlocks the editor. callers poll and sleep in scheme
     fn recv_paths(&self) -> RResult<FFIValue, RBoxError> {
         let receiver = self.inner.receiver.lock().unwrap();
-        let first = match receiver.recv() {
-            Ok(event) => event,
-            Err(_) => {
-                return RResult::RErr(RBoxError::new(io::Error::new(
-                    io::ErrorKind::BrokenPipe,
-                    "file watcher event channel disconnected",
-                )));
-            }
-        };
-
-        self.collect_paths_from(first, &receiver)
-    }
-
-    fn collect_paths_from(
-        &self,
-        first: Event,
-        receiver: &Receiver<Event>,
-    ) -> RResult<FFIValue, RBoxError> {
         let mut paths = HashSet::new();
-        collect_event_paths(first, &mut paths);
-
-        std::thread::sleep(EVENT_BATCH_DEBOUNCE);
 
         loop {
             match receiver.try_recv() {

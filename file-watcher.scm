@@ -74,14 +74,20 @@
      delay-ms
      (lambda () (for-each maybe-reload paths)))))
 
+;; receive-paths! never blocks (see lib.rs), so poll; each poll batches and
+;; dedupes whatever arrived since the last one
+(define poll-interval-ms 200)
+
 (define (loop-events delay-ms)
-  (define paths (receive-paths! global-watcher))
   (with-handler
    (lambda (err)
      (log::info! (to-string "err" err))
+     (time/sleep-ms poll-interval-ms)
      (loop-events delay-ms))
-   (when paths
-     (hx.with-context (lambda () (handle-event-paths! delay-ms paths))))
+   (let ([paths (receive-paths! global-watcher)])
+     (if (empty? paths)
+         (time/sleep-ms poll-interval-ms)
+         (hx.with-context (lambda () (handle-event-paths! delay-ms paths)))))
    (loop-events delay-ms)))
 
 (define *started* #f)
